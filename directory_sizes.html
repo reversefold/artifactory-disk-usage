@@ -1,0 +1,181 @@
+<html>
+<head>
+<title></title>
+<script src="//cdnjs.cloudflare.com/ajax/libs/require.js/2.3.1/require.min.js" type="text/javascript"></script>
+</head>
+<body>
+<form>
+    <label><input type="radio" name="mode" value="size" checked="checked"> Size</label><br/>
+    <label><input type="radio" name="mode" value="count"> Count</label>
+</form>
+<div style="float: left;"><span id="output_d3_title">&nbsp;</span></div>
+<div style="float: right;"><span id="mouseover_d3_title">&nbsp;</span></div>
+<div style="clear: both;"></div>
+<div style="width: 100%;">
+    <div id="output_d3" style="margin: 0 auto; width: 1000px;"></div>
+</div>
+<div style="clear: both;"></div>
+<div style="width: 100%; color: #666666; font-size: 10px; bottom: 0;">
+    <div style="width: 50%; margin: auto; text-align: center;">
+        Adapted from <a style="color: gray;" href="https://bl.ocks.org/kerryrodden/477c1bfb081b783f80ad">Kerry Rodden's Zoomable sunburst with updating data</a>
+    </div>
+</div>
+<script type="text/javascript">
+requirejs.config({
+  paths: {
+      'd3': '//cdnjs.cloudflare.com/ajax/libs/d3/3.4.8/d3.min',
+      'jquery': '//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min',
+  }
+});
+
+require(["jquery", "d3"], function($, d3) {
+    var width = 960,
+        height = 700,
+        radius = Math.min(width, height) / 2;
+
+    var x = d3.scale.linear()
+        .range([0, 2 * Math.PI]);
+
+    var y = d3.scale.sqrt()
+        .range([0, radius]);
+
+    var color = d3.scale.category20c();
+
+    var svg = d3.select("#output_d3").append("svg")
+        .attr("width", width)
+        .attr("height", height)
+      .append("g")
+        .attr("transform", "translate(" + width / 2 + "," + (height / 2 + 10) + ")");
+
+    var partition = d3.layout.partition()
+        .sort(null)
+        .value(function(d) { return 1; });
+
+    var arc = d3.svg.arc()
+        .startAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x))); })
+        .endAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x + d.dx))); })
+        .innerRadius(function(d) { return Math.max(0, y(d.y)); })
+        .outerRadius(function(d) { return Math.max(0, y(d.y + d.dy)); });
+
+    // Keep track of the node that is currently being displayed as the root.
+    var node;
+
+    d3.select(self.frameElement).style("height", height + "px");
+
+    // Setup for switching data: stash the old values for transition.
+    function stash(d) {
+      d.x0 = d.x;
+      d.dx0 = d.dx;
+    }
+
+    // When switching data: interpolate the arcs in data space.
+    function arcTweenData(a, i) {
+      var oi = d3.interpolate({x: a.x0, dx: a.dx0}, a);
+      function tween(t) {
+        var b = oi(t);
+        a.x0 = b.x;
+        a.dx0 = b.dx;
+        return arc(b);
+      }
+      if (i == 0) {
+       // If we are on the first arc, adjust the x domain to match the root node
+       // at the current zoom level. (We only need to do this once.)
+        var xd = d3.interpolate(x.domain(), [node.x, node.x + node.dx]);
+        return function(t) {
+          x.domain(xd(t));
+          return tween(t);
+        };
+      } else {
+        return tween;
+      }
+    }
+
+    // When zooming: interpolate the scales.
+    function arcTweenZoom(d) {
+      var xd = d3.interpolate(x.domain(), [d.x, d.x + d.dx]),
+          yd = d3.interpolate(y.domain(), [d.y, 1]),
+          yr = d3.interpolate(y.range(), [d.y ? 20 : 0, radius]);
+      return function(d, i) {
+        return i
+            ? function(t) { return arc(d); }
+            : function(t) { x.domain(xd(t)); y.domain(yd(t)).range(yr(t)); return arc(d); };
+      };
+    }
+
+    function formatted_size(size) {
+        var post = "";
+        var posts = ['K', 'M', 'G'];
+        for (var i = 0; i < posts.length; ++i) {
+            if (size / 1024 > 0) {
+                size /= 1024.0;
+            } else {
+                break;
+            }
+        }
+        if (i > 0) {
+            post = posts[i - 1];
+        } else {
+            post = "";
+        }
+        return size.toFixed(2) + post;
+    }
+        
+    function node_text(node) {
+        return node["path"] + " - " + formatted_size(node["size"]);
+    }
+
+    d3.json("directory_sizes_d3tree.json", function(error, root) {
+
+      $("#output_d3_title").text(node_text(root));
+      node = root;
+      var path = svg.datum(root).selectAll("path")
+          .data(partition.value(function (d) { return d.size; }).nodes)
+        .enter().append("path")
+          .attr("d", arc)
+          .style("fill", function(d) {
+              var c = d.children ? d : d.parent;
+              this._color = color(c ? c.path : null);
+              return this._color;
+          })
+          .on("click", click)
+          .each(stash);
+
+
+      path.append("svg:title")
+          .text(function(d) { return d["name"]; });
+        
+      path.on("mouseover", function(d) {
+        $("#mouseover_d3_title").text(node_text(d));
+        d3.select(this).transition().duration(200).style("fill", d3.rgb(this._color).brighter());
+      }).on("mouseout", function(d) {
+        $("#mouseover_d3_title").html("&nbsp;");
+        d3.select(this).transition().duration(200).style("fill", this._color);
+      });
+
+      
+
+      d3.selectAll("input").on("change", function change() {
+        var value = this.value === "count"
+            ? function() { return 1; }
+            : function(d) { return d.size; };
+
+        path
+            .data(partition.value(value).nodes)
+          .transition()
+            .duration(1000)
+            .attrTween("d", arcTweenData);
+      });
+
+      function click(d) {
+        $("#output_d3_title").text(node_text(d));
+        node = d;
+        path.transition()
+          .duration(1000)
+          .attrTween("d", arcTweenZoom(d));
+      }
+    });
+
+});
+</script>
+</body>
+</html>
