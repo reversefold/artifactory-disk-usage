@@ -106,15 +106,17 @@ require(["jquery", "d3"], function($, d3) {
         var post = "";
         var posts = ['K', 'M', 'G', 'T', 'P', 'E'];
         var outsize = size;
-        for (var i = 0; i < posts.length; ++i) {
-            if (outsize / 1024 > 0) {
+        var i;
+        for (i = 0; i < posts.length; ++i) {
+            if (Math.trunc(outsize / 1024) > 0) {
                 outsize /= 1024.0;
             } else {
                 break;
             }
         }
-        if (i > 0 && i < posts.length) {
-            post = posts[i - 1];
+        --i;
+        if (i >= 0 && i < posts.length) {
+            post = posts[i];
         } else {
             outsize = size;
             post = "";
