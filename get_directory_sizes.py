@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Usage:
-    %(script)s [--verbose] [--num-workers=<n>] <artifactory-url> <repositories>...
+    %(script)s [--verbose] [--num-workers=<n>] [-u <username>] [-p <password>] <artifactory-url> <repositories>...
 
 Options:
     <artifactory-url>          The base URL to access your artifactory (e.g. http://server:port/artifactory)
     <repositories>...          One or more repositories to get the sizes for
+    -u <username>              Artifactory user
+    -p <password>              Artifactory password
     -v --verbose               Verbose output
     -n <n> --num-workers <n>   The number of parallel workers to use to query the artifactory API. [Default: 10]
 """
@@ -34,7 +36,7 @@ import time
 
 import docopt
 import requests
-
+from requests.auth import HTTPBasicAuth
 
 class Error(Exception):
     pass
@@ -51,6 +53,8 @@ def main():
         get_folder_sizes(
             args['<artifactory-url>'],
             args['<repositories>'],
+            args['-u'],
+            args['-p'],
             verbose=args['--verbose'],
             num_workers=int(args['--num-workers'])
         )
@@ -59,11 +63,12 @@ def main():
 
 
 def get_folder_sizes(
-    artifactory_url, repositories,
+    artifactory_url, repositories, user=None, password=None,
     verbose=False, num_workers=10
 ):
     url = '%s/api/application.wadl' % (artifactory_url,)
-    resp = requests.head(url, timeout=5)
+    auth = HTTPBasicAuth(user, password) if user else None
+    resp = requests.get(url, auth=auth, timeout=5)
     if resp.status_code != 200:
         logging.info('Artifactory URL appears to be incorrect.')
         logging.info('Tried to access %s and got this response: %r\n%s', url, resp, resp.text)
@@ -86,7 +91,7 @@ def get_folder_sizes(
                 try:
                     if verbose:
                         logging.info('Getting info for %s', path)
-                    resp = requests.get('%s%s' % (storage_api_url, path), timeout=5)
+                    resp = requests.get('%s%s' % (storage_api_url, path), auth=auth, timeout=30)
                     if resp.status_code == 404:
                         out_queue.put((None, None, None))
                         continue
