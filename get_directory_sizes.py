@@ -36,7 +36,7 @@ import time
 
 import docopt
 import requests
-from requests.auth import HTTPBasicAuth
+
 
 class Error(Exception):
     pass
@@ -67,7 +67,7 @@ def get_folder_sizes(
     verbose=False, num_workers=10
 ):
     url = '%s/api/application.wadl' % (artifactory_url,)
-    auth = HTTPBasicAuth(user, password) if user else None
+    auth = (user, password) if user else None
     resp = requests.get(url, auth=auth, timeout=5)
     if resp.status_code != 200:
         logging.info('Artifactory URL appears to be incorrect.')
