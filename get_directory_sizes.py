@@ -13,15 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Usage:
-    %(script)s [--verbose] [--num-workers=<n>] [-u <username>] [-p <password>] <artifactory-url> <repositories>...
+    %(script)s [--verbose] [--num-workers=<n>] [--username=<username>] [--password=<password>] <artifactory-url> <repositories>...
 
 Options:
-    <artifactory-url>          The base URL to access your artifactory (e.g. http://server:port/artifactory)
-    <repositories>...          One or more repositories to get the sizes for
-    -u <username>              Artifactory user
-    -p <password>              Artifactory password
-    -v --verbose               Verbose output
-    -n <n> --num-workers <n>   The number of parallel workers to use to query the artifactory API. [Default: 10]
+    <artifactory-url>                     The base URL to access your artifactory (e.g. http://server:port/artifactory)
+    <repositories>...                     One or more repositories to get the sizes for
+    -u <username> --username=<username>   Artifactory user
+    -p <password> --password=<password>   Artifactory password
+    -v --verbose                          Verbose output
+    -n <n> --num-workers <n>              The number of parallel workers to use to query the artifactory API. [Default: 10]
 """
 from __future__ import print_function
 import collections
@@ -53,8 +53,8 @@ def main():
         get_folder_sizes(
             args['<artifactory-url>'],
             args['<repositories>'],
-            args['-u'],
-            args['-p'],
+            args['--username'],
+            args['--password'],
             verbose=args['--verbose'],
             num_workers=int(args['--num-workers'])
         )
