@@ -70,8 +70,14 @@ def get_folder_sizes(
     auth = (user, password) if user else None
     resp = requests.get(url, auth=auth, timeout=5)
     if resp.status_code != 200:
-        logging.info('Artifactory URL appears to be incorrect.')
-        logging.info('Tried to access %s and got this response: %r\n%s', url, resp, resp.text)
+        if resp.status_code == 401:
+            if auth is None:
+                logging.error('Artifactory URL appears to require authentication, use --username and --password.')
+            else:
+                logging.error('Credentials appear to be incorrect.')
+        else:
+            logging.error('Artifactory URL appears to be incorrect.')
+        logging.error('Tried to access %s and got this response: %r\n%s', url, resp, resp.text)
         raise Error('Failed to get application.wadl')
     storage_api_url = '%s/api/storage' % (artifactory_url,)
     initial_folders = ['/%s' % (repo,) for repo in repositories]
