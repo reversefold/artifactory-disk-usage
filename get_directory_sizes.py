@@ -68,7 +68,9 @@ def get_folder_sizes(
 ):
     url = '%s/api/application.wadl' % (artifactory_url,)
     auth = (user, password) if user else None
-    resp = requests.get(url, auth=auth, timeout=5)
+    artifactory_session = requests.Session()
+    artifactory_session.auth = auth
+    resp = artifactory_session.get(url, timeout=5)
     if resp.status_code != 200:
         if resp.status_code == 401:
             if auth is None:
@@ -97,7 +99,7 @@ def get_folder_sizes(
                 try:
                     if verbose:
                         logging.info('Getting info for %s', path)
-                    resp = requests.get('%s%s' % (storage_api_url, path), auth=auth, timeout=30)
+                    resp = artifactory_session.get('%s%s' % (storage_api_url, path), timeout=30)
                     if resp.status_code == 404:
                         out_queue.put((None, None, None))
                         continue
