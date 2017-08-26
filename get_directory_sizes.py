@@ -91,21 +91,23 @@ def get_folder_sizes(
     stop_event = threading.Event()
 
     def request_worker():
+        session = requests.Session()
+        session.auth = auth
         while not stop_event.is_set():
             try:
                 (path_type, path) = in_queue.get(timeout=0.1)
                 try:
                     if verbose:
                         logging.info('Getting info for %s', path)
-                    resp = requests.get('%s%s' % (storage_api_url, path), auth=auth, timeout=30)
+                    resp = session.get('%s%s' % (storage_api_url, path), timeout=30)
                     if resp.status_code == 404:
                         out_queue.put((None, None, None))
                         continue
                     resp.raise_for_status()
                     data = resp.json()
                     out_queue.put((path_type, path, data))
-                except Exception, e:
-                    logging.info('Got exception %r, requeueing', e)
+                except Exception as exc:
+                    logging.info('Got exception %r, requeueing', exc)
                     in_queue.put((path_type, path))
                     time.sleep(1)
             except Queue.Empty:
