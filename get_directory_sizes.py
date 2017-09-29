@@ -99,7 +99,7 @@ def get_folder_sizes(
                 try:
                     if verbose:
                         logging.info('Getting info for %s', path)
-                    resp = session.get('%s%s' % (storage_api_url, path), timeout=30)
+                    resp = session.get('%s%s' % (storage_api_url, requests.compat.quote(path)), timeout=30)
                     if resp.status_code == 404:
                         out_queue.put((None, None, None))
                         continue
