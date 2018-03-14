@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Usage:
-    %(script)s [--verbose] [--num-workers=<n>] [--username=<username>] [--password=<password>] <artifactory-url> <repositories>...
+    %(script)s [--verbose] [--num-workers=<n>] [--username=<u> --password=<p>] [--timeout=<t>] <artifactory-url> <repositories>...
 
 Options:
-    <artifactory-url>                     The base URL to access your artifactory (e.g. http://server:port/artifactory)
-    <repositories>...                     One or more repositories to get the sizes for
-    -u <username> --username=<username>   Artifactory user
-    -p <password> --password=<password>   Artifactory password
-    -v --verbose                          Verbose output
-    -n <n> --num-workers <n>              The number of parallel workers to use to query the artifactory API. [Default: 10]
+    <artifactory-url>          The base URL to access your artifactory (e.g. http://server:port/artifactory)
+    <repositories>...          One or more repositories to get the sizes for
+    -v --verbose               Verbose output
+    -n <n> --num-workers <n>   The number of parallel workers to use to query the artifactory API. [Default: 10]
+    -u <u> --username=<u>      Username to send to artifactory
+    -p <p> --password=<p>      Password to send to artifactory
+    -t <t> --timeout=<t>       Timeout in seconds to apply to HTTP calls to artifactory [Default: 30]
 """
 from __future__ import print_function
 import collections
@@ -81,6 +82,20 @@ except Exception:
 
 import docopt
 import requests
+import tenacity
+
+
+retry_decorator = tenacity.retry(stop=tenacity.stop_after_attempt(5), wait=tenacity.wait_random(min=1, max=3))
+
+
+class Session(requests.Session):
+    @retry_decorator
+    def head(self, *a, **k):
+        return super(Session, self).head(*a, **k)
+
+    @retry_decorator
+    def get(self, *a, **k):
+        return super(Session, self).get(*a, **k)
 
 
 class Error(Exception):
@@ -101,25 +116,30 @@ def main():
             args['--username'],
             args['--password'],
             verbose=args['--verbose'],
-            num_workers=int(args['--num-workers'])
+            num_workers=int(args['--num-workers']),
+            http_timeout=int(args['--timeout']),
         )
     except Error:
         sys.exit(1)
 
 
 def get_folder_sizes(
-    artifactory_url, repositories, user=None, password=None,
-    verbose=False, num_workers=10
+    artifactory_url, repositories,
+    username=None, password=None,
+    verbose=False, num_workers=10,
+    http_timeout=30
 ):
+    session = Session()
+    if username and password:
+        session.auth = (username, password)
     url = '%s/api/application.wadl' % (artifactory_url,)
-    auth = (user, password) if user else None
-    resp = requests.get(url, auth=auth, timeout=5)
+    resp = session.head(url, timeout=http_timeout)
     if resp.status_code != 200:
         if resp.status_code == 401:
-            if auth is None:
-                logging.error('Artifactory URL appears to require authentication, use --username and --password.')
-            else:
+            if username and password:
                 logging.error('Credentials appear to be incorrect.')
+            else:
+                logging.error('Artifactory URL appears to require authentication, use --username and --password.')
         else:
             logging.error('Artifactory URL appears to be incorrect.')
         logging.error('Tried to access %s and got this response: %r\n%s', url, resp, resp.text)
@@ -136,15 +156,16 @@ def get_folder_sizes(
     stop_event = threading.Event()
 
     def request_worker():
-        session = requests.Session()
-        session.auth = auth
+        session = Session()
+        if username and password:
+            session.auth = (username, password)
         while not stop_event.is_set():
             try:
                 (path_type, path) = in_queue.get(timeout=0.1)
                 try:
                     if verbose:
                         logging.info('Getting info for %s', path)
-                    resp = session.get('%s%s' % (storage_api_url, requests.compat.quote(path)), timeout=30)
+                    resp = session.get('%s%s' % (storage_api_url, path), timeout=http_timeout)
                     if resp.status_code == 404:
                         out_queue.put((None, None, None))
                         continue
@@ -159,7 +180,7 @@ def get_folder_sizes(
                 pass
 
     request_workers = []
-    for _ in xrange(num_workers):
+    for _ in range(num_workers):
         thr = threading.Thread(target=request_worker)
         thr.start()
         request_workers.append(thr)
