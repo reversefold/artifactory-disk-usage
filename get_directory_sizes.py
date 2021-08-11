@@ -29,56 +29,11 @@ import collections
 import datetime
 import json
 import logging
+import os
 import Queue
+import sys
 import threading
 import time
-
-# START boilerplate imports
-import os
-import sys
-import urllib2
-# END boilerplate imports
-
-
-REQUIREMENTS = ['docopt', 'requests', 'tenacity']
-
-
-# START boilerplate
-try:
-    import pkg_resources
-    pkg_resources.require(REQUIREMENTS)
-
-# We're expecting ImportError or pkg_resources.ResolutionError but since pkg_resources might not be importable,
-# we're just catching Exception.
-except Exception:
-    PIP_OPTIONS = '--index-url http://artidev.shn.io:8081/artifactory/api/pypi/pypi/simple --trusted-host artidev.shn.io'
-    PYPI_URL = 'http://artidev.shn.io:8081/artifactory/api/pypi/pypi'
-    GET_PIP_URL = 'http://artidev.shn.io:8081/artifactory/shn-support-tools/get-pip.py'
-    if __name__ != '__main__':
-        raise
-    try:
-        import magicreq
-        magicreq.magic(
-            REQUIREMENTS,
-            pip_options=PIP_OPTIONS,
-            pypi_url=PYPI_URL,
-            get_pip_url=GET_PIP_URL
-        )
-    except ImportError:
-        url = 'http://artidev.shn.io:8081/artifactory/shn-support-tools/magicreq_bootstrap.py'
-        bootstrap_script = os.path.join(os.getcwd(), '.magicreq_bootstrap.py')
-        with open(bootstrap_script, 'w') as outfile:
-            outfile.write(urllib2.urlopen(url).read())
-        cmd = [
-            sys.executable,
-            bootstrap_script,
-            'PIP_OPTIONS:%s' % (PIP_OPTIONS,),
-            'PYPI_URL:%s' % (PYPI_URL,),
-            'GET_PIP_URL:%s' % (GET_PIP_URL,),
-        ] + sys.argv
-        os.execv(sys.executable, cmd)
-# END boilerplate
-
 
 import docopt
 import requests
