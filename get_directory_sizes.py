@@ -29,14 +29,21 @@ import collections
 import datetime
 import json
 import logging
-import Queue
+import os
+import sys
 import threading
 import time
 
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty
+
 # START boilerplate imports
-import os
-import sys
-import urllib2
+try:
+    from urllib import request
+except ImportError:
+    import urllib2 as request
 # END boilerplate imports
 
 
@@ -68,7 +75,7 @@ except Exception:
         url = 'http://artidev.shn.io:8081/artifactory/shn-support-tools/magicreq_bootstrap.py'
         bootstrap_script = os.path.join(os.getcwd(), '.magicreq_bootstrap.py')
         with open(bootstrap_script, 'w') as outfile:
-            outfile.write(urllib2.urlopen(url).read())
+            outfile.write(request.urlopen(url).read())
         cmd = [
             sys.executable,
             bootstrap_script,
@@ -149,10 +156,10 @@ def get_folder_sizes(
     num_queued = len(initial_folders)
     logging.info('Getting recursive folder sizes for repositories: %r', repositories)
     folder_sizes = {'/': 0}
-    in_queue = Queue.Queue()
+    in_queue = Queue()
     for folder in initial_folders:
         in_queue.put(('folder', folder))
-    out_queue = Queue.Queue()
+    out_queue = Queue()
     stop_event = threading.Event()
 
     def request_worker():
@@ -176,7 +183,7 @@ def get_folder_sizes(
                     logging.info('Got exception %r, requeueing', exc)
                     in_queue.put((path_type, path))
                     time.sleep(1)
-            except Queue.Empty:
+            except Empty:
                 pass
 
     request_workers = []
@@ -223,7 +230,7 @@ def get_folder_sizes(
                         child_uri = '%s%s%s' % ('/'.join(path.split('/')[:2]), data['path'], child['uri'])
                         num_queued += 1
                         in_queue.put((('folder' if child['folder'] else 'file'), child_uri))
-            except Queue.Empty:
+            except Empty:
                 pass
     finally:
         if verbose:
