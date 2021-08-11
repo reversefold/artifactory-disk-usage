@@ -132,18 +132,6 @@ def get_folder_sizes(
     session = Session()
     if username and password:
         session.auth = (username, password)
-    url = '%s/api/application.wadl' % (artifactory_url,)
-    resp = session.head(url, timeout=http_timeout)
-    if resp.status_code != 200:
-        if resp.status_code == 401:
-            if username and password:
-                logging.error('Credentials appear to be incorrect.')
-            else:
-                logging.error('Artifactory URL appears to require authentication, use --username and --password.')
-        else:
-            logging.error('Artifactory URL appears to be incorrect.')
-        logging.error('Tried to access %s and got this response: %r\n%s', url, resp, resp.text)
-        raise Error('Failed to get application.wadl')
     storage_api_url = '%s/api/storage' % (artifactory_url,)
     initial_folders = ['/%s' % (repo,) for repo in repositories]
     num_queued = len(initial_folders)
